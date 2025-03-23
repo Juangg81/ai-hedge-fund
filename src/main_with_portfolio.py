@@ -1,9 +1,12 @@
+import sys
+
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 from colorama import Fore, Back, Style, init
 import questionary
-
+from agents.ben_graham import ben_graham_agent
+from agents.bill_ackman import bill_ackman_agent
 from agents.fundamentals import fundamentals_agent
 from agents.portfolio_manager import portfolio_management_agent
 from agents.technicals import technical_analyst_agent
@@ -13,14 +16,17 @@ from agents.warren_buffett import warren_buffett_agent
 from graph.state import AgentState
 from agents.valuation import valuation_agent
 from utils.display import print_trading_output
-from utils.analysts import ANALYST_ORDER
+from utils.analysts import ANALYST_ORDER, get_analyst_nodes
 from utils.progress import progress
+from llm.models import LLM_ORDER, get_model_info
 from tools.api import get_price_data
 
 import argparse
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from tabulate import tabulate
+from utils.visualize import save_graph_as_png
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,12 +35,17 @@ init(autoreset=True)
 
 
 def parse_hedge_fund_response(response):
-    import json
-
+    """Parses a JSON string and returns a dictionary."""
     try:
         return json.loads(response)
-    except:
-        print(f"Error parsing response: {response}")
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error: {e}\nResponse: {repr(response)}")
+        return None
+    except TypeError as e:
+        print(f"Invalid response type (expected string, got {type(response).__name__}): {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error while parsing response: {e}\nResponse: {repr(response)}")
         return None
 
 
@@ -45,14 +56,16 @@ def run_hedge_fund(
     end_date: str,
     portfolio: dict,
     show_reasoning: bool = False,
-    selected_analysts: list = None,
+    selected_analysts: list[str] = [],
+    model_name: str = "gpt-4o",
+    model_provider: str = "OpenAI",
 ):
     # Start progress tracking
     progress.start()
 
     try:
         # Create a new workflow if analysts are customized
-        if selected_analysts is not None:
+        if selected_analysts:
             workflow = create_workflow(selected_analysts)
             agent = workflow.compile()
         else:
@@ -74,6 +87,8 @@ def run_hedge_fund(
                 },
                 "metadata": {
                     "show_reasoning": show_reasoning,
+                    "model_name": model_name,
+                    "model_provider": model_provider,
                 },
             },
         )
@@ -96,6 +111,9 @@ def create_workflow(selected_analysts=None):
     """Create the workflow with selected analysts."""
     workflow = StateGraph(AgentState)
     workflow.add_node("start_node", start)
+
+    # Get analyst nodes from the configuration
+    analyst_nodes = get_analyst_nodes()
 
     # Default to all analysts if none selected
     if selected_analysts is None:
