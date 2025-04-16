@@ -143,7 +143,10 @@ def create_workflow(selected_analysts=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the hedge fund trading system")
     parser.add_argument("--initial-cash", type=float, default=100000.0, help="Initial cash position. Defaults to 100000.0)")
-    parser.add_argument("--margin-requirement", type=float, default=100.0, help="Initial margin requirement. Defaults to 100
+    parser.add_argument("--margin-requirement", type=float, default=100.0, help="Initial margin requirement. Defaults to 100")
+    parser.add_argument("--tickers", type=str, required=True, help="Comma-separated list of stock ticker symbols")
+
+    parser.add_argument(
         "--start-date",
         type=str,
         help="Start date (YYYY-MM-DD). Defaults to 3 months before end date",
@@ -266,9 +269,9 @@ if __name__ == "__main__":
             portfolio = {
                 "cash": args.initial_cash,
                 "margin_requirement": args.margin_requirement,  # Initial margin requirement
-                "positions": _positions, # Initial stock positions
-                "realized_gains": _realized_gains, # Realized gains from long positions
-            }  
+                "positions": _positions,  # Initial stock positions
+                "realized_gains": _realized_gains,  # Realized gains from long positions
+            }
         else:
             raise ValueError("Number of tickers}, positions, and cost basis must match")
 
@@ -283,43 +286,43 @@ if __name__ == "__main__":
                 end_date=end_date,
             )
             _positions[ticker] = {
-                    "long": float(position),
-                    "short": 0.0,
-                    "long_cost_basis": float(prices["close"].iloc[-1]),
-                    "short_cost_basis": 0.0,
-                }
+                "long": float(position),
+                "short": 0.0,
+                "long_cost_basis": float(prices["close"].iloc[-1]),
+                "short_cost_basis": 0.0,
+            }
             _realized_gains[ticker] = {
-                    "long": 0.0,
-                    "short": 0.0,
-                }
+                "long": 0.0,
+                "short": 0.0,
+            }
         portfolio = {
             "cash": args.initial_cash,
             "margin_requirement": args.margin_requirement,  # Initial margin requirement
-            "positions": _positions, # Initial stock positions
-            "realized_gains": _realized_gains, # Realized gains from long positions
-            }
+            "positions": _positions,  # Initial stock positions
+            "realized_gains": _realized_gains,  # Realized gains from long positions
+        }
 
     else:
         portfolio = {
-        "cash": args.initial_cash,  # Initial cash amount
-        "margin_requirement": args.margin_requirement,  # Initial margin requirement
-        "positions": {
-            ticker: {
-                "long": 0,  # Number of shares held long
-                "short": 0,  # Number of shares held short
-                "long_cost_basis": 0.0,  # Average cost basis for long positions
-                "short_cost_basis": 0.0,  # Average price at which shares were sold short
-            }
-            for ticker in tickers
-        },
-        "realized_gains": {
-            ticker: {
-                "long": 0.0,  # Realized gains from long positions
-                "short": 0.0,  # Realized gains from short positions
-            }
-            for ticker in tickers
-        },
-    }
+            "cash": args.initial_cash,  # Initial cash amount
+            "margin_requirement": args.margin_requirement,  # Initial margin requirement
+            "positions": {
+                ticker: {
+                    "long": 0,  # Number of shares held long
+                    "short": 0,  # Number of shares held short
+                    "long_cost_basis": 0.0,  # Average cost basis for long positions
+                    "short_cost_basis": 0.0,  # Average price at which shares were sold short
+                }
+                for ticker in tickers
+            },
+            "realized_gains": {
+                ticker: {
+                    "long": 0.0,  # Realized gains from long positions
+                    "short": 0.0,  # Realized gains from short positions
+                }
+                for ticker in tickers
+            },
+        }
 
     # Run the hedge fund
     result = run_hedge_fund(
