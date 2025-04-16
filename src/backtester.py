@@ -77,10 +77,11 @@ class Backtester:
             },
             "realized_gains": {
                 ticker: {
-                    "long": 0.0,   # Realized gains from long positions
+                    "long": 0.0,  # Realized gains from long positions
                     "short": 0.0,  # Realized gains from short positions
-                } for ticker in tickers
-            }
+                }
+                for ticker in tickers
+            },
         }
 
     def execute_trade(self, ticker: str, action: str, quantity: float, current_price: float):
@@ -311,14 +312,7 @@ class Backtester:
 
         dates = pd.date_range(self.start_date, self.end_date, freq="B")
         table_rows = []
-        performance_metrics = {
-            'sharpe_ratio': None,
-            'sortino_ratio': None,
-            'max_drawdown': None,
-            'long_short_ratio': None,
-            'gross_exposure': None,
-            'net_exposure': None
-        }
+        performance_metrics = {"sharpe_ratio": None, "sortino_ratio": None, "max_drawdown": None, "long_short_ratio": None, "gross_exposure": None, "net_exposure": None}
 
         print("\nStarting backtest...")
 
@@ -395,32 +389,16 @@ class Backtester:
             total_value = self.calculate_portfolio_value(current_prices)
 
             # Also compute long/short exposures for final post‐trade state
-            long_exposure = sum(
-                self.portfolio["positions"][t]["long"] * current_prices[t]
-                for t in self.tickers
-            )
-            short_exposure = sum(
-                self.portfolio["positions"][t]["short"] * current_prices[t]
-                for t in self.tickers
-            )
+            long_exposure = sum(self.portfolio["positions"][t]["long"] * current_prices[t] for t in self.tickers)
+            short_exposure = sum(self.portfolio["positions"][t]["short"] * current_prices[t] for t in self.tickers)
 
             # Calculate gross and net exposures
             gross_exposure = long_exposure + short_exposure
             net_exposure = long_exposure - short_exposure
-            long_short_ratio = (
-                long_exposure / short_exposure if short_exposure > 1e-9 else float('inf')
-            )
+            long_short_ratio = long_exposure / short_exposure if short_exposure > 1e-9 else float("inf")
 
             # Track each day's portfolio value in self.portfolio_values
-            self.portfolio_values.append({
-                "Date": current_date,
-                "Portfolio Value": total_value,
-                "Long Exposure": long_exposure,
-                "Short Exposure": short_exposure,
-                "Gross Exposure": gross_exposure,
-                "Net Exposure": net_exposure,
-                "Long/Short Ratio": long_short_ratio
-            })
+            self.portfolio_values.append({"Date": current_date, "Portfolio Value": total_value, "Long Exposure": long_exposure, "Short Exposure": short_exposure, "Gross Exposure": gross_exposure, "Net Exposure": net_exposure, "Long/Short Ratio": long_short_ratio})
 
             # ---------------------------------------------------------------
             # 3) Build the table rows to display
@@ -447,7 +425,7 @@ class Backtester:
                 # Get the action and quantity from the decisions
                 action = decisions.get(ticker, {}).get("action", "hold")
                 quantity = executed_trades.get(ticker, 0)
-                
+
                 # Append the agent action to the table rows
                 date_rows.append(
                     format_backtest_row(
@@ -469,7 +447,6 @@ class Backtester:
             # Calculate portfolio return vs. initial capital
             # The realized gains are already reflected in cash balance, so we don't add them separately
             portfolio_return = (total_value / self.initial_capital - 1) * 100
-
             # Add summary row for this day
             date_rows.append(
                 format_backtest_row(
@@ -533,9 +510,9 @@ class Backtester:
             if downside_std > 1e-12:
                 performance_metrics["sortino_ratio"] = np.sqrt(252) * (mean_excess_return / downside_std)
             else:
-                performance_metrics["sortino_ratio"] = float('inf') if mean_excess_return > 0 else 0
+                performance_metrics["sortino_ratio"] = float("inf") if mean_excess_return > 0 else 0
         else:
-            performance_metrics["sortino_ratio"] = float('inf') if mean_excess_return > 0 else 0
+            performance_metrics["sortino_ratio"] = float("inf") if mean_excess_return > 0 else 0
 
         # Maximum drawdown (ensure it's stored as a negative percentage)
         rolling_max = values_df["Portfolio Value"].cummax()
@@ -632,7 +609,7 @@ class Backtester:
         if avg_loss != 0:
             win_loss_ratio = avg_win / avg_loss
         else:
-            win_loss_ratio = float('inf') if avg_win > 0 else 0
+            win_loss_ratio = float("inf") if avg_win > 0 else 0
         print(f"Win/Loss Ratio: {Fore.GREEN}{win_loss_ratio:.2f}{Style.RESET_ALL}")
 
         # Maximum Consecutive Wins / Losses
@@ -716,10 +693,7 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         selected_analysts = choices
-        print(
-            f"\nSelected analysts: "
-            f"{', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in choices)}"
-        )
+        print(f"\nSelected analysts: " f"{', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in choices)}")
 
     # Select LLM model based on whether Ollama is being used
     model_choice = None
