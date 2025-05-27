@@ -1,28 +1,23 @@
-FROM python:3.10-slim-bullseye
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies (if needed by your packages)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Set PYTHONPATH to include the app directory
+ENV PYTHONPATH=/app
 
 # Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
+RUN pip install poetry==1.7.1
 
-# Add poetry to PATH
-ENV PATH="/root/.local/bin:$PATH"
+# Copy only dependency files first for better caching
+COPY pyproject.toml poetry.lock* /app/
 
-# Copy project files
-COPY pyproject.toml poetry.lock .env ./
-COPY ./src .
+# Configure Poetry to not use a virtual environment
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi
 
-# Install project dependencies
-RUN poetry install --no-root --no-interaction --no-ansi
+# Copy rest of the source code
+COPY . /app/
 
-# Set the entrypoint
-
-ENTRYPOINT  ["/bin/bash"]
-
+# Default command (will be overridden by Docker Compose)
+CMD ["python", "src/main.py"] 
 

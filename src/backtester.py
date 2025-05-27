@@ -10,19 +10,19 @@ from colorama import Fore, Style, init
 import numpy as np
 import itertools
 
-from llm.models import LLM_ORDER, OLLAMA_LLM_ORDER, get_model_info, ModelProvider
-from utils.analysts import ANALYST_ORDER
-from main import run_hedge_fund
-from tools.api import (
+from src.llm.models import LLM_ORDER, OLLAMA_LLM_ORDER, get_model_info, ModelProvider
+from src.utils.analysts import ANALYST_ORDER
+from src.main import run_hedge_fund
+from src.tools.api import (
     get_company_news,
     get_price_data,
     get_prices,
     get_financial_metrics,
     get_insider_trades,
 )
-from utils.display import print_backtest_results, format_backtest_row
+from src.utils.display import print_backtest_results, format_backtest_row
 from typing_extensions import Callable
-from utils.ollama import ensure_ollama_and_model
+from src.utils.ollama import ensure_ollama_and_model
 
 init(autoreset=True)
 
@@ -66,15 +66,7 @@ class Backtester:
             "cash": initial_capital,
             "margin_used": 0.0,  # total margin usage across all short positions
             "margin_requirement": initial_margin_requirement,  # The margin ratio required for shorts
-            "positions": {
-                ticker: {
-                    "long": 0,               # Number of shares held long
-                    "short": 0,              # Number of shares held short
-                    "long_cost_basis": 0.0,  # Average cost basis per share (long)
-                    "short_cost_basis": 0.0, # Average cost basis per share (short)
-                    "short_margin_used": 0.0 # Dollars of margin used for this ticker's short
-                } for ticker in tickers
-            },
+            "positions": {ticker: {"long": 0, "short": 0, "long_cost_basis": 0.0, "short_cost_basis": 0.0, "short_margin_used": 0.0} for ticker in tickers},  # Number of shares held long  # Number of shares held short  # Average cost basis per share (long)  # Average cost basis per share (short)  # Dollars of margin used for this ticker's short
             "realized_gains": {
                 ticker: {
                     "long": 0.0,  # Realized gains from long positions
@@ -267,7 +259,7 @@ class Backtester:
 
             # Short position unrealized PnL = short_shares * (short_cost_basis - current_price)
             if position["short"] > 0:
-                total_value += position["short"] * (position["short_cost_basis"] - price)
+                total_value -= position["short"] * price
 
         return total_value
 
@@ -294,17 +286,6 @@ class Backtester:
             get_company_news(ticker, self.end_date, start_date=self.start_date, limit=1000)
 
         print("Data pre-fetch complete.")
-
-    def parse_agent_response(self, agent_output):
-        """Parse JSON output from the agent (fallback to 'hold' if invalid)."""
-        import json
-
-        try:
-            decision = json.loads(agent_output)
-            return decision
-        except Exception:
-            print(f"Error parsing action: {agent_output}")
-            return {"action": "hold", "quantity": 0}
 
     def run_backtest(self):
         # Pre-fetch all data at the start
@@ -335,7 +316,7 @@ class Backtester:
             try:
                 current_prices = {}
                 missing_data = False
-                
+
                 for ticker in self.tickers:
                     try:
                         price_data = get_price_data(ticker, previous_date_str, current_date_str)
@@ -348,11 +329,11 @@ class Backtester:
                         print(f"Error fetching price for {ticker} between {previous_date_str} and {current_date_str}: {e}")
                         missing_data = True
                         break
-                
+
                 if missing_data:
                     print(f"Skipping trading day {current_date_str} due to missing price data")
                     continue
-                
+
             except Exception as e:
                 # If there's a general API error, log it and skip this day
                 print(f"Error fetching prices for {current_date_str}: {e}")
@@ -517,15 +498,15 @@ class Backtester:
         # Maximum drawdown (ensure it's stored as a negative percentage)
         rolling_max = values_df["Portfolio Value"].cummax()
         drawdown = (values_df["Portfolio Value"] - rolling_max) / rolling_max
-        
+
         if len(drawdown) > 0:
             min_drawdown = drawdown.min()
             # Store as a negative percentage
             performance_metrics["max_drawdown"] = min_drawdown * 100
-            
+
             # Store the date of max drawdown for reference
             if min_drawdown < 0:
-                performance_metrics["max_drawdown_date"] = drawdown.idxmin().strftime('%Y-%m-%d')
+                performance_metrics["max_drawdown_date"] = drawdown.idxmin().strftime("%Y-%m-%d")
             else:
                 performance_metrics["max_drawdown_date"] = None
         else:
@@ -548,13 +529,9 @@ class Backtester:
 
         print(f"\n{Fore.WHITE}{Style.BRIGHT}PORTFOLIO PERFORMANCE SUMMARY:{Style.RESET_ALL}")
         print(f"Total Return: {Fore.GREEN if total_return >= 0 else Fore.RED}{total_return:.2f}%{Style.RESET_ALL}")
-        
+
         # Print realized P&L for informational purposes only
-        total_realized_gains = sum(
-            self.portfolio["realized_gains"][ticker]["long"] + 
-            self.portfolio["realized_gains"][ticker]["short"] 
-            for ticker in self.tickers
-        )
+        total_realized_gains = sum(self.portfolio["realized_gains"][ticker]["long"] + self.portfolio["realized_gains"][ticker]["short"] for ticker in self.tickers)
         print(f"Total Realized Gains/Losses: {Fore.GREEN if total_realized_gains >= 0 else Fore.RED}${total_realized_gains:,.2f}{Style.RESET_ALL}")
 
         # Plot the portfolio value over time
@@ -580,15 +557,15 @@ class Backtester:
         print(f"\nSharpe Ratio: {Fore.YELLOW}{annualized_sharpe:.2f}{Style.RESET_ALL}")
 
         # Use the max drawdown value calculated during the backtest if available
-        max_drawdown = getattr(self, 'performance_metrics', {}).get('max_drawdown')
-        max_drawdown_date = getattr(self, 'performance_metrics', {}).get('max_drawdown_date')
-        
+        max_drawdown = getattr(self, "performance_metrics", {}).get("max_drawdown")
+        max_drawdown_date = getattr(self, "performance_metrics", {}).get("max_drawdown_date")
+
         # If no value exists yet, calculate it
         if max_drawdown is None:
             rolling_max = performance_df["Portfolio Value"].cummax()
             drawdown = (performance_df["Portfolio Value"] - rolling_max) / rolling_max
             max_drawdown = drawdown.min() * 100
-            max_drawdown_date = drawdown.idxmin().strftime('%Y-%m-%d') if pd.notnull(drawdown.idxmin()) else None
+            max_drawdown_date = drawdown.idxmin().strftime("%Y-%m-%d") if pd.notnull(drawdown.idxmin()) else None
 
         if max_drawdown_date:
             print(f"Maximum Drawdown: {Fore.RED}{abs(max_drawdown):.2f}%{Style.RESET_ALL} (on {max_drawdown_date})")
@@ -663,92 +640,123 @@ if __name__ == "__main__":
         help="Margin ratio for short positions, e.g. 0.5 for 50% (default: 0.0)",
     )
     parser.add_argument(
-        "--ollama", action="store_true", help="Use Ollama for local LLM inference"
+        "--analysts",
+        type=str,
+        required=False,
+        help="Comma-separated list of analysts to use (e.g., michael_burry,other_analyst)",
     )
+    parser.add_argument(
+        "--analysts-all",
+        action="store_true",
+        help="Use all available analysts (overrides --analysts)",
+    )
+    parser.add_argument("--ollama", action="store_true", help="Use Ollama for local LLM inference")
 
     args = parser.parse_args()
 
     # Parse tickers from comma-separated string
     tickers = [ticker.strip() for ticker in args.tickers.split(",")] if args.tickers else []
 
-    # Choose analysts
+    # Parse analysts from command-line flags
     selected_analysts = None
-    choices = questionary.checkbox(
-        "Use the Space bar to select/unselect analysts.",
-        choices=[questionary.Choice(display, value=value) for display, value in ANALYST_ORDER],
-        instruction="\n\nPress 'a' to toggle all.\n\nPress Enter when done to run the hedge fund.",
-        validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
-        style=questionary.Style(
-            [
-                ("checkbox-selected", "fg:green"),
-                ("selected", "fg:green noinherit"),
-                ("highlighted", "noinherit"),
-                ("pointer", "noinherit"),
-            ]
-        ),
-    ).ask()
-
-    if not choices:
-        print("\n\nInterrupt received. Exiting...")
-        sys.exit(0)
+    if args.analysts_all:
+        selected_analysts = [a[1] for a in ANALYST_ORDER]
+    elif args.analysts:
+        selected_analysts = [a.strip() for a in args.analysts.split(",") if a.strip()]
     else:
-        selected_analysts = choices
-        print(f"\nSelected analysts: " f"{', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in choices)}")
-
-    # Select LLM model based on whether Ollama is being used
-    model_choice = None
-    model_provider = None
-    
-    if args.ollama:
-        print(f"{Fore.CYAN}Using Ollama for local LLM inference.{Style.RESET_ALL}")
-        
-        # Select from Ollama-specific models
-        model_choice = questionary.select(
-            "Select your Ollama model:",
-            choices=[questionary.Choice(display, value=value) for display, value, _ in OLLAMA_LLM_ORDER],
-            style=questionary.Style([
-                ("selected", "fg:green bold"),
-                ("pointer", "fg:green bold"),
-                ("highlighted", "fg:green"),
-                ("answer", "fg:green bold"),
-            ])
+        # Choose analysts interactively
+        choices = questionary.checkbox(
+            "Use the Space bar to select/unselect analysts.",
+            choices=[questionary.Choice(display, value=value) for display, value in ANALYST_ORDER],
+            instruction="\n\nPress 'a' to toggle all.\n\nPress Enter when done to run the hedge fund.",
+            validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
+            style=questionary.Style(
+                [
+                    ("checkbox-selected", "fg:green"),
+                    ("selected", "fg:green noinherit"),
+                    ("highlighted", "noinherit"),
+                    ("pointer", "noinherit"),
+                ]
+            ),
         ).ask()
-        
-        if not model_choice:
+        if not choices:
             print("\n\nInterrupt received. Exiting...")
             sys.exit(0)
-        
+        else:
+            selected_analysts = choices
+            print(f"\nSelected analysts: " f"{', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in choices)}")
+
+    # Select LLM model based on whether Ollama is being used
+    model_name = ""
+    model_provider = None
+
+    if args.ollama:
+        print(f"{Fore.CYAN}Using Ollama for local LLM inference.{Style.RESET_ALL}")
+
+        # Select from Ollama-specific models
+        model_name = questionary.select(
+            "Select your Ollama model:",
+            choices=[questionary.Choice(display, value=value) for display, value, _ in OLLAMA_LLM_ORDER],
+            style=questionary.Style(
+                [
+                    ("selected", "fg:green bold"),
+                    ("pointer", "fg:green bold"),
+                    ("highlighted", "fg:green"),
+                    ("answer", "fg:green bold"),
+                ]
+            ),
+        ).ask()
+
+        if not model_name:
+            print("\n\nInterrupt received. Exiting...")
+            sys.exit(0)
+
+        if model_name == "-":
+            model_name = questionary.text("Enter the custom model name:").ask()
+            if not model_name:
+                print("\n\nInterrupt received. Exiting...")
+                sys.exit(0)
+
         # Ensure Ollama is installed, running, and the model is available
-        if not ensure_ollama_and_model(model_choice):
+        if not ensure_ollama_and_model(model_name):
             print(f"{Fore.RED}Cannot proceed without Ollama and the selected model.{Style.RESET_ALL}")
             sys.exit(1)
-        
+
         model_provider = ModelProvider.OLLAMA.value
-        print(f"\nSelected {Fore.CYAN}Ollama{Style.RESET_ALL} model: {Fore.GREEN + Style.BRIGHT}{model_choice}{Style.RESET_ALL}\n")
+        print(f"\nSelected {Fore.CYAN}Ollama{Style.RESET_ALL} model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
     else:
         # Use the standard cloud-based LLM selection
         model_choice = questionary.select(
             "Select your LLM model:",
-            choices=[questionary.Choice(display, value=value) for display, value, _ in LLM_ORDER],
-            style=questionary.Style([
-                ("selected", "fg:green bold"),
-                ("pointer", "fg:green bold"),
-                ("highlighted", "fg:green"),
-                ("answer", "fg:green bold"),
-            ])
+            choices=[questionary.Choice(display, value=(name, provider)) for display, name, provider in LLM_ORDER],
+            style=questionary.Style(
+                [
+                    ("selected", "fg:green bold"),
+                    ("pointer", "fg:green bold"),
+                    ("highlighted", "fg:green"),
+                    ("answer", "fg:green bold"),
+                ]
+            ),
         ).ask()
 
         if not model_choice:
             print("\n\nInterrupt received. Exiting...")
             sys.exit(0)
+        
+        model_name, model_provider = model_choice
+
+        model_info = get_model_info(model_name, model_provider)
+        if model_info:
+            if model_info.is_custom():
+                model_name = questionary.text("Enter the custom model name:").ask()
+                if not model_name:
+                    print("\n\nInterrupt received. Exiting...")
+                    sys.exit(0)
+
+            print(f"\nSelected {Fore.CYAN}{model_provider}{Style.RESET_ALL} model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
         else:
-            model_info = get_model_info(model_choice)
-            if model_info:
-                model_provider = model_info.provider.value
-                print(f"\nSelected {Fore.CYAN}{model_provider}{Style.RESET_ALL} model: {Fore.GREEN + Style.BRIGHT}{model_choice}{Style.RESET_ALL}\n")
-            else:
-                model_provider = "Unknown"
-                print(f"\nSelected model: {Fore.GREEN + Style.BRIGHT}{model_choice}{Style.RESET_ALL}\n")
+            model_provider = "Unknown"
+            print(f"\nSelected model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
 
     # Create and run the backtester
     backtester = Backtester(
@@ -757,7 +765,7 @@ if __name__ == "__main__":
         start_date=args.start_date,
         end_date=args.end_date,
         initial_capital=args.initial_capital,
-        model_name=model_choice,
+        model_name=model_name,
         model_provider=model_provider,
         selected_analysts=selected_analysts,
         initial_margin_requirement=args.margin_requirement,
