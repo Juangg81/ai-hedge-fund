@@ -428,7 +428,6 @@ class Backtester:
             # Calculate portfolio return vs. initial capital
             # The realized gains are already reflected in cash balance, so we don't add them separately
             portfolio_return = (total_value / self.initial_capital - 1) * 100
-
             # Add summary row for this day
             date_rows.append(
                 format_backtest_row(

@@ -56,7 +56,7 @@ def risk_management_agent(state: AgentState):
     # Calculate risk limits for each ticker in the universe
     for ticker in tickers:
         progress.update_status("risk_management_agent", ticker, "Calculating position limits")
-        
+     
         if ticker not in current_prices:
             progress.update_status("risk_management_agent", ticker, "Failed: No price data available")
             risk_analysis[ticker] = {

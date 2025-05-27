@@ -20,3 +20,4 @@ COPY . /app/
 
 # Default command (will be overridden by Docker Compose)
 CMD ["python", "src/main.py"] 
+
