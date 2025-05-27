@@ -1,13 +1,13 @@
 from langchain_openai import ChatOpenAI
-from graph.state import AgentState, show_agent_reasoning
-from tools.api import get_financial_metrics, get_market_cap, search_line_items
+from src.graph.state import AgentState, show_agent_reasoning
+from src.tools.api import get_financial_metrics, get_market_cap, search_line_items
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 import json
 from typing_extensions import Literal
-from utils.progress import progress
-from utils.llm import call_llm
+from src.utils.progress import progress
+from src.utils.llm import call_llm
 
 
 class BillAckmanSignal(BaseModel):
@@ -110,7 +110,7 @@ def bill_ackman_agent(state: AgentState):
             "reasoning": ackman_output.reasoning
         }
         
-        progress.update_status("bill_ackman_agent", ticker, "Done")
+        progress.update_status("bill_ackman_agent", ticker, "Done", analysis=ackman_output.reasoning)
     
     # Wrap results in a single message for the chain
     message = HumanMessage(
@@ -124,6 +124,8 @@ def bill_ackman_agent(state: AgentState):
     
     # Add signals to the overall state
     state["data"]["analyst_signals"]["bill_ackman_agent"] = ackman_analysis
+
+    progress.update_status("bill_ackman_agent", None, "Done")
 
     return {
         "messages": [message],
