@@ -341,3 +341,20 @@ def prices_to_df(prices: list[Price]) -> pd.DataFrame:
 def get_price_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     prices = get_prices(ticker, start_date, end_date)
     return prices_to_df(prices)
+
+
+if __name__ == "__main__":
+    # Example usage
+    ticker = "AAPL"
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+    start_date = (end_date_obj - relativedelta(months=3)).strftime("%Y-%m-%d")
+
+    original = get_price_data(ticker=ticker, start_date=start_date, end_date=end_date)
+    metrics = get_financial_metrics(
+        ticker=ticker,
+        end_date=end_date,
+        period="ttm",
+    )
+    print(type(metrics))
+    print(metrics)
